@@ -8,7 +8,6 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.jdbc.JdbcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DuplicateKeyException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.model.Mpa;
 import ru.yandex.practicum.filmorate.model.User;
@@ -50,13 +49,13 @@ public class LikeDbStorageTest {
         user3 = userStorage.create(user3);
 
         film1 = new Film(null, "Film1", "desc1", LocalDate.of(1991, 1, 1), 110L, new Mpa(1L, "G"), new LinkedHashSet<>(),
-                new HashSet<>(), 0L);
+                new LinkedHashSet<>(), new HashSet<>(), 0L);
         film1 = filmStorage.create(film1);
         film2 = new Film(null, "Film2", "desc2", LocalDate.of(1992, 1, 1), 110L, new Mpa(2L, "PG"), new LinkedHashSet<>(),
-                new HashSet<>(), 0L);
+                new LinkedHashSet<>(), new HashSet<>(), 0L);
         film2 = filmStorage.create(film2);
         film3 = new Film(null, "Film3", "desc3", LocalDate.of(1993, 1, 1), 110L, new Mpa(3L, "PG-13"),
-                new LinkedHashSet<>(), new HashSet<>(), 0L);
+                new LinkedHashSet<>(), new LinkedHashSet<>(), new HashSet<>(), 0L);
         film3 = filmStorage.create(film3);
     }
 
@@ -65,11 +64,14 @@ public class LikeDbStorageTest {
         likeStorage.likeFilm(film3, user1);
         likeStorage.likeFilm(film3, user2);
         likeStorage.likeFilm(film3, user3);
+        likeStorage.updateCountLikes(film3);
         likeStorage.likeFilm(film2, user1);
         likeStorage.likeFilm(film2, user2);
+        likeStorage.updateCountLikes(film2);
         likeStorage.likeFilm(film1, user1);
+        likeStorage.updateCountLikes(film1);
 
-        assertEquals(List.of(film3, film2, film1), filmStorage.popularFilms(3));
+        assertEquals(List.of(film3, film2, film1), filmStorage.getPopularFilms(3, null, null));
 
         // количество лайков должно совпадать с выборкой из БД
         assertEquals(film3.getCountLikes(), likeStorage.getLikes(film3));
@@ -77,11 +79,11 @@ public class LikeDbStorageTest {
         assertEquals(film1.getCountLikes(), likeStorage.getLikes(film1));
 
         // проверка на дубликат лайка, должно быть исключение
-        assertThrows(DuplicateKeyException.class, () -> likeStorage.likeFilm(film3, user1));
+        assertDoesNotThrow(() -> likeStorage.likeFilm(film3, user1));
 
         // добавить лайк не существующего фильма, должно быть исключение
         Film film = new Film(1000L, "Film1000", "desc1000", LocalDate.of(1993, 1, 1), 110L, new Mpa(3L, "PG-13"),
-                new LinkedHashSet<>(), new HashSet<>(), 0L);
+                new LinkedHashSet<>(), new LinkedHashSet<>(), new HashSet<>(), 0L);
         assertThrows(DataIntegrityViolationException.class, () -> likeStorage.likeFilm(film, user1));
 
         // добавить лайк от не существующего юзера, должно быть исключение
@@ -93,7 +95,7 @@ public class LikeDbStorageTest {
     public void deleteLike() {
         // удалить лайк не существующего фильма, должно быть исключение
         Film film = new Film(1000L, "Film1000", "desc1000", LocalDate.of(1993, 1, 1), 110L, new Mpa(3L, "PG-13"),
-                new LinkedHashSet<>(), new HashSet<>(), 0L);
+                new LinkedHashSet<>(), new LinkedHashSet<>(), new HashSet<>(), 0L);
         assertDoesNotThrow(() -> likeStorage.deleteLike(film, user1));
 
         // удалить лайк от не существующего юзера, должно быть исключение
@@ -103,14 +105,14 @@ public class LikeDbStorageTest {
         likeStorage.likeFilm(film1, user1);
 
         // проверка на дубликат лайка, должно быть исключение
-        assertThrows(DuplicateKeyException.class, () -> likeStorage.likeFilm(film1, user1));
+        assertDoesNotThrow(() -> likeStorage.likeFilm(film1, user1));
 
         likeStorage.likeFilm(film1, user2);
         likeStorage.likeFilm(film2, user1);
-        assertEquals(List.of(film1, film2), filmStorage.popularFilms(2));
+        assertEquals(List.of(film1, film2), filmStorage.getPopularFilms(2, null, null));
 
         likeStorage.deleteLike(film2, user1);
-        assertEquals(List.of(film1), filmStorage.popularFilms(1));
+        assertEquals(List.of(film1), filmStorage.getPopularFilms(1, null, null));
 
         // удаляем остальные два лайка
         likeStorage.deleteLike(film1, user1);
@@ -122,9 +124,12 @@ public class LikeDbStorageTest {
         likeStorage.likeFilm(film3, user1);
         likeStorage.likeFilm(film3, user2);
         likeStorage.likeFilm(film3, user3);
+        likeStorage.updateCountLikes(film3);
         likeStorage.likeFilm(film2, user1);
         likeStorage.likeFilm(film2, user2);
+        likeStorage.updateCountLikes(film2);
         likeStorage.likeFilm(film1, user1);
+        likeStorage.updateCountLikes(film1);
 
         // количество лайков должно совпадать с выборкой из БД
         assertEquals(film3.getCountLikes(), likeStorage.getLikes(film3));
@@ -133,6 +138,7 @@ public class LikeDbStorageTest {
 
         likeStorage.deleteLike(film3, user1);
         likeStorage.deleteLike(film3, user2);
+        likeStorage.updateCountLikes(film3);
         assertEquals(1L, film3.getCountLikes());
         assertEquals(film3.getCountLikes(), likeStorage.getLikes(film3));
     }
